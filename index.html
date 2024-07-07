@@ -6,6 +6,7 @@
     <title>最帥醫師李健嘉排班程式</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -13,7 +14,7 @@
             margin: 0;
             padding: 20px;
         }
-        h1, h2 {
+        h1, h2, h3, h4 {
             color: #333;
         }
         input, select, button {
@@ -33,12 +34,32 @@
         th {
             background-color: #f2f2f2;
         }
-        #staffList div {
+        .group {
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            padding: 10px;
+            cursor: move;
+            transition: background-color 0.3s;
+        }
+        .group:hover {
+            background-color: #f0f0f0;
+        }
+        .blue-background-class {
+            background-color: #e0e0ff;
+        }
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 10px;
         }
-        .prescheduled-dates {
-            margin-left: 10px;
-            color: #666;
+        .group-name {
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .group-actions {
+            display: flex;
+            gap: 10px;
         }
         .action-buttons {
             margin-top: 20px;
@@ -86,10 +107,10 @@
     
     <div>
         <label for="year">年份：</label>
-        <input type="number" id="year" min="2000" max="2100" value="2024" onchange="clearAllPreschedules()">
+        <input type="number" id="year" min="2000" max="2100" value="2024">
         
         <label for="month">月份：</label>
-        <select id="month" onchange="clearAllPreschedules()">
+        <select id="month">
             <option value="1">1月</option>
             <option value="2">2月</option>
             <option value="3">3月</option>
@@ -105,16 +126,16 @@
         </select>
     </div>
     
-    <h2>人員列表</h2>
-    <div id="staffList"></div>
+    <h2>群組列表</h2>
+    <button onclick="addGroup()">新增群組</button>
+    <button onclick="addDoubleKingGroup()">新增群組(雙王版本)</button>
+    <div id="groupList"></div>
     
     <div class="action-buttons">
-        <button onclick="addStaff()">新增人員</button>
         <button onclick="generateSchedule()">生成排班表</button>
-        <button onclick="saveStaffData()">儲存人員資料</button>
-        <button onclick="loadStaffData()">載入人員資料</button>
-        <button onclick="deleteAllStaff()">刪除所有人員</button>
-        <button onclick="deleteAllPreschedules()">刪除所有預班</button>
+        <button onclick="saveData()">儲存資料</button>
+        <button onclick="loadData()">載入資料</button>
+        <button onclick="deleteAllGroups()">刪除所有群組</button>
     </div>
     
     <input type="file" id="fileInput" style="display: none;" accept=".json" onchange="handleFileUpload(event)">
@@ -125,31 +146,30 @@
     <h2>值班統計</h2>
     <div id="statisticsResult"></div>
 
-    <div id="ruleModal" class="modal" style="display: none;">
+    <div id="ruleModal" class="modal">
         <div class="modal-content">
             <span class="close-button" onclick="hideRules()">&times;</span>
             <h2>排班規則</h2>
             <ul>
-                <li>預班人員優先: 如果某天有人員已經預班,那麼優先排排那些預班的人員。</li>
-                <li>最大值班天數限制: 每個人員都有最大值班天數的限制,不能超過設定的天數。</li>
-                <li>最大假日值班限制: 每個人員可以設定最大假日值班天數,超過限制就不會再安排假日值班。</li>
-                <li>避免連續值班: 系統會盡量避免將同一名人員連續值班,除非剩餘人員已經達到最大值班天數。</li>
-                <li>優先安排未達最小值班天數的人員: 如果某人員的實際值班天數未達到最小值班天數,那麼系統會優先安排該人員值班,直到達到最小值班天數。</li>
-                <li>隨機選擇剩餘人員: 如果有多個可選的人員,系統會隨機選擇其中一人進行值班安排。</li>
+                <li>群組獨立排班: 每個群組都有自己的獨立排班表。</li>
+                <li>預班優先: 如果某天有人員已經預班，那麼優先排那些預班的人員。</li>
+                <li>最大值班天數限制: 每個人員都有最大值班天數的限制，不能超過設定的天數。</li>
+                <li>最大假日值班限制: 每個人員可以設定最大假日值班天數，超過限制就不會再安排假日值班。</li>
+                <li>避免連續值班: 系統會盡量避免將同一名人員連續值班，除非剩餘人員已經達到最大值班天數。</li>
+                <li>優先安排未達最小值班天數的人員: 如果某人員的實際值班天數未達到最小值班天數，那麼系統會優先安排該人員值班，直到達到最小值班天數。</li>
+                <li>隨機選擇剩餘人員: 如果有多個可選的人員，系統會隨機選擇其中一人進行值班安排。</li>
+                <li>不值班日: 人員可以設置特定日期為不值班日，系統在排班時會避開這些日期。</li>
+                <li>雙王版本: 特定群組可以設置為雙王版本，將不考慮連續值班的限制。</li>
             </ul>
         </div>
     </div>
 
+    <!-- JavaScript 文件引用 -->
+    <script src="main.js"></script>
+    <script src="storage.js"></script>
+    <script src="group.js"></script>
+    <script src="staff.js"></script>
     <script src="schedule.js"></script>
-
-    <script>
-        function showRules() {
-            document.getElementById("ruleModal").style.display = "block";
-        }
-
-        function hideRules() {
-            document.getElementById("ruleModal").style.display = "none";
-        }
-    </script>
+    <script src="ui.js"></script>
 </body>
 </html>
