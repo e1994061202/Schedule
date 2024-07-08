@@ -178,77 +178,134 @@ function confirmDates(groupId, staffId) {
 function displayScheduleResult(year, month, groupSchedules, unfulfilled) {
     const resultDiv = document.getElementById("scheduleResult");
     resultDiv.innerHTML = '';
-
     const daysInMonth = new Date(year, month, 0).getDate();
     
     let tableHTML = `
         <h3>${year}年${month}月排班表</h3>
         <table>
             <tr>
-                <th>日期 (星期)</th>
+                <th colspan="2" style="width: 80px; text-align: center;">日期</th>
                 ${groupList.map(group => `<th>${group.name}</th>`).join('')}
             </tr>
     `;
-
     for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month - 1, day);
         const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
         tableHTML += `
             <tr>
-                <td>${day} (${dayOfWeek})</td>
+                <td style="text-align: center; width: 40px;">${day}</td>
+                <td style="text-align: center; width: 40px;">${dayOfWeek}</td>
                 ${groupList.map(group => `<td>${groupSchedules[group.id][day-1] || '未排班'}</td>`).join('')}
             </tr>
         `;
     }
-
     tableHTML += `</table>`;
     resultDiv.innerHTML = tableHTML;
-
     if (unfulfilled.length > 0) {
         const unfulfilledDiv = document.createElement('div');
         unfulfilledDiv.innerHTML = `<p>警告：以下人員未達到最小值班天數：${unfulfilled.join(', ')}</p>`;
         resultDiv.appendChild(unfulfilledDiv);
     }
+    // 顯示下載按鈕
+    document.getElementById("downloadButtonContainer").style.display = "block";
 }
+function downloadExcel() {
+    const year = document.getElementById("year").value;
+    const month = document.getElementById("month").value;
+    const daysInMonth = new Date(year, month, 0).getDate();
 
-function displayStatistics(groupStaffWorkDays) {
-    const statisticsDiv = document.getElementById("statisticsResult");
-    statisticsDiv.innerHTML = '<h3>值班統計</h3>';
+    // 創建工作表數據
+    let wsData = [
+        ["日期", ...groupList.map(group => group.name)]
+    ];
 
-    groupList.forEach(group => {
-        const staffWorkDays = groupStaffWorkDays[group.id];
-        
-        let groupTableHTML = `
-            <h4>${group.name}</h4>
-            <table>
-                <tr>
-                    <th>人員</th>
-                    <th>總值班日數</th>
-                    <th>平日班數</th>
-                    <th>假日班數</th>
-                </tr>
-        `;
+    for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month - 1, day);
+        const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+        const row = [
+            `${day} (${dayOfWeek})`,
+            ...groupList.map(group => globalGroupSchedules[group.id][day-1] || '未排班')
+        ];
+        wsData.push(row);
+    }
 
-        group.staffList.forEach(staff => {
-            const workDays = staffWorkDays[staff.id];
-            groupTableHTML += `
-                <tr>
-                    <td>${staff.name}</td>
-                    <td>${workDays.total}</td>
-                    <td>${workDays.weekdays}</td>
-                    <td>${workDays.holidays}</td>
-                </tr>
-            `;
-        });
+    // 創建工作表
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-        groupTableHTML += `</table>`;
-        
-        const groupDiv = document.createElement('div');
-        groupDiv.innerHTML = groupTableHTML;
-        statisticsDiv.appendChild(groupDiv);
-    });
+    // 創建工作簿
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "排班表");
+
+    // 生成 Excel 文件並下載
+    XLSX.writeFile(wb, `排班表_${year}年${month}月.xlsx`);
 }
+function downloadExcel() {
+    const year = document.getElementById("year").value;
+    const month = document.getElementById("month").value;
+    const fileName = `排班表_${year}年${month}月.xlsx`;
 
+    if (!confirm(`確定要下載 ${fileName} 嗎？\n\n注意：文件將被保存到您的默認下載位置。請確保您知道文件將被保存在哪裡。`)) {
+        return;  // 如果用戶取消，則不執行下載
+    }
+
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    // 創建工作表數據
+    let wsData = [
+        ["日期", null, ...groupList.map(group => group.name)],
+        ["日", "星期", ...groupList.map(() => null)]
+    ];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month - 1, day);
+        const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+        const row = [
+            day,
+            dayOfWeek,
+            ...groupList.map(group => globalGroupSchedules[group.id][day-1] || '未排班')
+        ];
+        wsData.push(row);
+    }
+
+    // 創建工作表
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // 設置列寬
+    const wscols = [
+        {wch: 5},  // 日期列寬度
+        {wch: 5},  // 星期列寬度
+        ...groupList.map(() => ({wch: 15}))  // 其他列寬度
+    ];
+    ws['!cols'] = wscols;
+
+    // 合併單元格
+    ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }  // 合併第一行的前兩個單元格
+    ];
+
+    // 設置所有單元格樣式為置中
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({r: R, c: C});
+            if (!ws[cellAddress]) continue;
+            if (!ws[cellAddress].s) ws[cellAddress].s = {};
+            ws[cellAddress].s.alignment = { horizontal: 'center', vertical: 'center' };
+        }
+    }
+
+    // 創建工作簿
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "排班表");
+
+    // 生成 Excel 文件並下載
+    XLSX.writeFile(wb, fileName, { cellStyles: true });
+
+    // 下載完成後顯示提示
+    setTimeout(() => {
+        alert(`文件 ${fileName} 已開始下載。\n如果下載沒有自動開始，請檢查您的瀏覽器下載設置。`);
+    }, 100);
+}
 function renameGroup(groupId) {
     const group = groupList.find(g => g.id === groupId);
     if (group) {
@@ -300,4 +357,42 @@ function deleteStaff(groupId, staffId) {
             saveToLocalStorage();
         }
     }
+}
+
+function displayStatistics(groupStaffWorkDays) {
+    const statisticsDiv = document.getElementById("statisticsResult");
+    statisticsDiv.innerHTML = '<h3>值班統計</h3>';
+
+    groupList.forEach(group => {
+        const staffWorkDays = groupStaffWorkDays[group.id];
+        
+        let groupTableHTML = `
+            <h4>${group.name}</h4>
+            <table>
+                <tr>
+                    <th>人員</th>
+                    <th>總值班日數</th>
+                    <th>平日班數</th>
+                    <th>假日班數</th>
+                </tr>
+        `;
+
+        group.staffList.forEach(staff => {
+            const workDays = staffWorkDays[staff.id];
+            groupTableHTML += `
+                <tr>
+                    <td>${staff.name}</td>
+                    <td>${workDays.total}</td>
+                    <td>${workDays.weekdays}</td>
+                    <td>${workDays.holidays}</td>
+                </tr>
+            `;
+        });
+
+        groupTableHTML += `</table>`;
+        
+        const groupDiv = document.createElement('div');
+        groupDiv.innerHTML = groupTableHTML;
+        statisticsDiv.appendChild(groupDiv);
+    });
 }

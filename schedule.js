@@ -1,13 +1,14 @@
+let globalGroupSchedules = {};
+
 function generateSchedule() {
     const year = parseInt(document.getElementById("year").value);
     const month = parseInt(document.getElementById("month").value);
     const daysInMonth = new Date(year, month, 0).getDate();
     
-    let groupSchedules = {};
-    let groupStaffWorkDays = {};
-    
+    globalGroupSchedules = {};
+    let groupStaffWorkDays = {};    
     groupList.forEach(group => {
-        groupSchedules[group.id] = new Array(daysInMonth).fill(null);
+        globalGroupSchedules[group.id] = new Array(daysInMonth).fill(null);
         groupStaffWorkDays[group.id] = {};
         group.staffList.forEach(staff => {
             groupStaffWorkDays[group.id][staff.id] = { total: 0, weekdays: 0, holidays: 0 };
@@ -32,7 +33,7 @@ function generateSchedule() {
                 // 如果有預班人員，優先從預班人員中選擇
                 let availablePrescheduled = getAvailableStaff(prescheduledStaff, groupStaffWorkDays[group.id], isHoliday, previousAssignments, day - 1, group.isDoubleKing);
                 if (availablePrescheduled.length > 0) {
-                    assignStaff(availablePrescheduled, groupSchedules[group.id], groupStaffWorkDays[group.id], previousAssignments, day, isHoliday);
+                    assignStaff(availablePrescheduled, globalGroupSchedules[group.id], groupStaffWorkDays[group.id], previousAssignments, day, isHoliday);
                     continue;  // 如果已經安排了預班人員，就進入下一天
                 }
             }
@@ -52,15 +53,16 @@ function generateSchedule() {
                     );
                     
                     if (priorityStaff.length > 0) {
-                        assignStaff(priorityStaff, groupSchedules[group.id], groupStaffWorkDays[group.id], previousAssignments, day, isHoliday);
+                        assignStaff(priorityStaff, globalGroupSchedules[group.id], groupStaffWorkDays[group.id], previousAssignments, day, isHoliday);
                     } else {
-                        assignStaff(staffToAssign, groupSchedules[group.id], groupStaffWorkDays[group.id], previousAssignments, day, isHoliday);
+                        assignStaff(staffToAssign, globalGroupSchedules[group.id], groupStaffWorkDays[group.id], previousAssignments, day, isHoliday);
                     }
                 }
             }
         }
     });
     
+
     // 檢查最小值班天數
     let unfulfilled = [];
     groupList.forEach(group => {
@@ -72,7 +74,7 @@ function generateSchedule() {
     });
     
     // 顯示結果
-    displayScheduleResult(year, month, groupSchedules, unfulfilled);
+    displayScheduleResult(year, month, globalGroupSchedules, unfulfilled);
     displayStatistics(groupStaffWorkDays);
 }
 

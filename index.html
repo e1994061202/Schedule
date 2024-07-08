@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -142,7 +143,10 @@
     
     <h2>排班結果</h2>
     <div id="scheduleResult"></div>
-    
+    <div id="downloadButtonContainer" style="display: none;">
+        <button onclick="downloadExcel()">下載排班表 (Excel)</button>
+    </div>
+
     <h2>值班統計</h2>
     <div id="statisticsResult"></div>
 
