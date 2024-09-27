@@ -81,14 +81,38 @@ function generateSchedule() {
 function getAvailableStaff(staffList, staffWorkDays, isHoliday, previousAssignments, currentDay, isDoubleKing) {
     return staffList.filter(staff => {
         const workDays = staffWorkDays[staff.id];
+        const lastWorkDay = findLastWorkDay(previousAssignments, currentDay, staff.name);
         return workDays.total < staff.maxDays &&
             (staff.maxHolidays === null || !isHoliday || workDays.holidays < staff.maxHolidays) &&
-            (isDoubleKing || !isConsecutiveDay(previousAssignments, currentDay, staff.name));
+            (isDoubleKing || !isConsecutiveDay(previousAssignments, currentDay, staff.name)) &&
+            (lastWorkDay === -1 || currentDay - lastWorkDay > 2);  // 確保至少有兩天的休息
     });
 }
-
+function findLastWorkDay(previousAssignments, currentDay, staffName) {
+    for (let i = currentDay - 1; i >= 0; i--) {
+        if (previousAssignments[i] === staffName) {
+            return i;
+        }
+    }
+    return -1;
+}
 function assignStaff(availableStaff, schedule, staffWorkDays, previousAssignments, day, isHoliday) {
-    let selectedStaff = availableStaff[Math.floor(Math.random() * availableStaff.length)];
+    // 計算權重
+    const weights = availableStaff.map(staff => 1 / (staffWorkDays[staff.id].total + 1));
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    
+    // 根據權重隨機選擇
+    let random = Math.random() * totalWeight;
+    let selectedStaff;
+    for (let i = 0; i < availableStaff.length; i++) {
+        random -= weights[i];
+        if (random <= 0) {
+            selectedStaff = availableStaff[i];
+            break;
+        }
+    }
+
+    // 更新排班和統計資訊
     schedule[day - 1] = selectedStaff.name;
     previousAssignments[day - 1] = selectedStaff.name;
     let workDays = staffWorkDays[selectedStaff.id];
